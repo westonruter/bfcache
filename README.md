@@ -69,6 +69,14 @@ Relevant core tickets that this revisits:
 * [#57627](https://core.trac.wordpress.org/ticket/57627): The Cache-Control header for logged-in pages should include `private`
 * [#61942](https://core.trac.wordpress.org/ticket/61942): Add "no-store" to Cache-Control header to prevent unexpected cache behavior
 
+### Before: Navigating the WordPress Admin without Back/forward Cache (bfcache)
+
+[![Navigating the WordPress Admin without Back/forward Cache (bfcache)](https://img.youtube.com/vi/Cz-_L6q9ZRc/maxresdefault.jpg)](https://youtu.be/Cz-_L6q9ZRc?t=22)
+
+### After: Navigating the WordPress Admin with Back/forward Cache (bfcache)
+
+[![Navigating the WordPress Admin with Back/forward Cache (bfcache)](https://img.youtube.com/vi/z4dILiwe0Rk/maxresdefault.jpg)](https://youtu.be/z4dILiwe0Rk?t=27)
+
 ## Installation
 
 1. Visit **Plugins > Add New** in the WordPress Admin.
