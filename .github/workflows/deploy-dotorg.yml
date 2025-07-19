@@ -1,0 +1,45 @@
+name: Deploy to WordPress.org
+
+on:
+    release:
+        types:
+            - published
+    workflow_dispatch:
+        inputs:
+            dry-run:
+                type: boolean
+                description: 'Debug mode (run without publishing).'
+                default: false
+jobs:
+    release:
+        name: Publish release
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version-file: '.nvmrc'
+                  cache: 'npm' # Automatically caches npm dependencies
+
+            - name: Prepare dist
+              run: npm run plugin-zip && unzip nocache-bfcache.zip -d dist
+
+            - name: WordPress plugin deploy
+              uses: 10up/action-wordpress-plugin-deploy@stable
+              id: deploy
+              with:
+                  dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run || false }}
+              env:
+                  SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+                  SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+                  SLUG: nocache-bfcache
+                  BUILD_DIR: dist
+
+            - name: Upload release asset
+              if: github.event_name == 'release'
+              run: gh release upload ${{ github.event.release.tag_name }} nocache-bfcache.zip
+              env:
+                  GH_TOKEN: ${{ secrets.WORKFLOW_TOKEN }}
