@@ -16,7 +16,7 @@ This plugin enables instant back/forward browser navigation by removing the `no-
 
 The speed of page navigations in WordPress saw a big boost in 6.8 with the introduction of [Speculative Loading](https://make.wordpress.org/core/2025/03/06/speculative-loading-in-6-8/). However, by default Speculative Loading in WordPress is not configured to enable _instant_ page loads, which requires a non-conservative eagerness with the prerender mode; not all sites can even opt in to prerendering due to compatibility issues, such as with analytics, and due to concerns about sustainability with unused prerenders (e.g. increasing server load and taxing a user's bandwidth/CPU). While Speculative Loading (i.e. the Speculation Rules API) is relatively new and currently only supported in Chromium browsers (e.g. Chrome and Edge), there is a much older web platform technology that enables prerendering _and_ which is supported in all browsers: the back/forward cache (bfcache). This instant loading involves no network traffic and no CPU load, since previously visited pages are stored in memory. According to the web.dev article on [back/forward cache](https://web.dev/articles/bfcache):
 
-> Chrome usage data shows that 1 in 10 navigations on desktop and 1 in 5 on mobile are either back or forward. With bfcache enabled, browsers could eliminate the data transfer and time spent loading for billions of web pages every single day!
+**Chrome usage data shows that 1 in 10 navigations on desktop and 1 in 5 on mobile are either back or forward. With bfcache enabled, browsers could eliminate the data transfer and time spent loading for billions of web pages every single day!**
 
 Also learn more via the following video:
 
@@ -24,17 +24,7 @@ Also learn more via the following video:
 
 Normally, WordPress sends a `Cache-Control` header with the `no-store` directive when a user is logged in. This has the effect of [breaking the browser's bfcache](https://web.dev/articles/bfcache#minimize-no-store), which means that navigating back or forward in the browser requires the pages to be re-fetched from the server and for any JavaScript on the page to re-execute. The result can be a sluggish navigation experience not only when navigating around the WP Admin (see [Jetpack demo video](https://github.com/Automattic/jetpack/pull/44322#:~:text=page%20load%20is%3A-,Without%20bfcache,-With%20bfcache)) but also when navigating around the frontend of a site. Furthermore, the lack of bfcache can cause data loss when data has been entered via a JavaScript-built UI since this state is lost when a page is not restored via bfcache (see [WooCommerce demo video](https://github.com/woocommerce/woocommerce/pull/58445#issuecomment-3014404754)).
 
-This plugin strips out the `no-store` directive when it is present, while ensuring that the `private` directive is sent in its place. (If your site absolutely needs `no-store` for some reason, then don't use this plugin.) The reason behind why the `no-store` directive was added in the first place was to prevent proxies from caching private page responses. However, there is the more appropriate [`private` directive](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#private) for this purpose:
-
-> The `private` response directive indicates that the response can be stored only in a private cache (e.g., local caches in browsers).
->
-> You should add the `private` directive for user-personalized content, especially for responses received after login and for sessions managed via cookies.
->
-> If you forget to add `private` to a response with personalized content, then that response can be stored in a shared cache and end up being reused for multiple users, which can cause personal information to leak.
-
-This is in contrast with the [`no-store` directive](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-store) which prevents caching both by proxies _and_ by the browser's bfcache:
-
-> The `no-store` response directive indicates that any caches of any kind (private or shared) should not store this response.
+This plugin strips out the `no-store` directive when it is present, while ensuring that the `private` directive is sent in its place. (If your site absolutely needs `no-store` for some reason, then don't use this plugin.) The reason behind why the `no-store` directive was added in the first place was to prevent proxies from caching private page responses. However, there is the more appropriate [`private` directive](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#private) for this purpose: "The `private` response directive indicates that the response can be stored only in a private cache (e.g., local caches in browsers)." This is in contrast with the [`no-store` directive](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control#no-store) which prevents caching both by proxies _and_ by the browser's bfcache.
 
 In addition to replacing `no-store` with `private`, this plugin also adds `no-cache`, `max-age=0`, and `must-revalidate` and ensures `public` is removed, all to further guard against any misconfigured proxy from caching the private response.
 
@@ -47,21 +37,6 @@ In any case, to address this privacy concern, two safeguards are in place to pro
 
 Since JavaScript is required to invalidate bfcache, the login form is extended to pass along whether scripting is enabled. Only when JS is enabled will the `no-store` directive be omitted from the `Cache-Control` response header. This ensures that users with JavaScript turned off will retain the privacy protection after logging out.
 
-There is another privacy scenario not handled by this plugin: reopening closed tabs for authenticated pages. It turns out that recently closed tabs are not put into the bfcache but are stored in the browser's HTTP cache. This means the JavaScript heap is not restored when the tab is re-opened (at least not in browsers currently); the `persisted` property of the `pageshow` event object is `false`, and all JavaScript is re-executed. Some form fields that had been populated with unsubmitted data _may_ be restored by the browser in the same way as they are restored when navigating back/forward for pages served with the `no-store` directive, but browsers differ on to what degree they restore this session information. In particular, only static form fields served with the initial HTML may be restored; any form fields generated with JavaScript will likely not get any data restored. So this is a partial privacy protection for re-opened closed tabs. This being said, Chromium issue [40052728](https://issues.chromium.org/issues/40052728) proposes putting closed tabs in bfcache:
-
-> ClosedTabCache aims to make the "Reopen Closed Tab" button instant for recently closed tabs. It will rely on functionality from BackForwardCache for Chrome. The main use case for this project is users accidentally closing tabs and wanting to restore them shortly after. Performance gains are expected if we are able to restore these tabs instantly with all their content.
-
-At one time (in 2020) this was even implemented and [made available](https://9to5google.com/2020/07/02/google-chrome-reopen-closed-tab-instant/) behind a “Closed Tab Cache” flag in Chrome, but this is no longer available. Therefore, since there is not a reliable way to invalidate cached pages in closed browser tabs, the ability for pages served by WordPress to be stored in bfcache currently uses the “Remember Me” checkbox as an opt-in. Nevertheless, this additional privacy safeguard may be excessive. A ✨ emoji is displayed next to the checkbox in a button that opens a popover that promotes the capability.
-
-The logic in this plugin is also proposed in a [core patch](https://github.com/WordPress/wordpress-develop/pull/9131) for [#63636](https://core.trac.wordpress.org/ticket/63636): Enable instant page navigations from browser history via bfcache when sending "nocache" headers.
-
-Relevant core tickets that this revisits:
-
-* [#21938](https://core.trac.wordpress.org/ticket/21938): Add "no-store" to Cache-Control header to prevent history caching of admin resources
-* [#55491](https://core.trac.wordpress.org/ticket/55491): Replace `unload` event handlers from core
-* [#57627](https://core.trac.wordpress.org/ticket/57627): The Cache-Control header for logged-in pages should include `private`
-* [#61942](https://core.trac.wordpress.org/ticket/61942): Add "no-store" to Cache-Control header to prevent unexpected cache behavior
-
 ### Before: Navigating the WordPress Admin without Back/forward Cache (bfcache)
 
 [![Navigating the WordPress Admin without Back/forward Cache (bfcache)](https://img.youtube.com/vi/Cz-_L6q9ZRc/maxresdefault.jpg)](https://youtu.be/Cz-_L6q9ZRc?t=22)
@@ -71,6 +46,8 @@ Relevant core tickets that this revisits:
 [![Navigating the WordPress Admin with Back/forward Cache (bfcache)](https://img.youtube.com/vi/z4dILiwe0Rk/maxresdefault.jpg)](https://youtu.be/z4dILiwe0Rk?t=27)
 
 ## Installation
+
+### Installation from within WordPress
 
 1. Visit **Plugins > Add New** in the WordPress Admin.
 2. Search for **No-cache BFCache**.
@@ -90,7 +67,26 @@ You may also install and update via [Git Updater](https://git-updater.com/) usin
 
 ## FAQ
 
-## Why is bfcache working in Chrome even though my site is using Cache-Control: no-store?
+### What WordPress core tickets does this plugin relate to?
+
+The functionality in this plugin is proposed for WordPress core in Trac ticket [#63636](https://core.trac.wordpress.org/ticket/63636): Enable instant page navigations from browser history via bfcache when sending "nocache" headers.
+
+Other relevant core tickets that this revisits:
+
+* [#21938](https://core.trac.wordpress.org/ticket/21938): Add "no-store" to Cache-Control header to prevent history caching of admin resources
+* [#55491](https://core.trac.wordpress.org/ticket/55491): Replace `unload` event handlers from core
+* [#57627](https://core.trac.wordpress.org/ticket/57627): The Cache-Control header for logged-in pages should include `private`
+* [#61942](https://core.trac.wordpress.org/ticket/61942): Add "no-store" to Cache-Control header to prevent unexpected cache behavior
+
+### What about reopening closed browser tabs?
+
+There is another privacy scenario not handled by this plugin: reopening closed tabs for authenticated pages. It turns out that recently closed tabs are not put into the bfcache but are stored in the browser's HTTP cache. This means the JavaScript heap is not restored when the tab is re-opened (at least not in browsers currently); the `persisted` property of the `pageshow` event object is `false`, and all JavaScript is re-executed. Some form fields that had been populated with unsubmitted data _may_ be restored by the browser in the same way as they are restored when navigating back/forward for pages served with the `no-store` directive, but browsers differ on to what degree they restore this session information. In particular, only static form fields served with the initial HTML may be restored; any form fields generated with JavaScript will likely not get any data restored. So this is a partial privacy protection for re-opened closed tabs. This being said, Chromium issue [40052728](https://issues.chromium.org/issues/40052728) proposes putting closed tabs in bfcache:
+
+_ClosedTabCache aims to make the "Reopen Closed Tab" button instant for recently closed tabs. It will rely on functionality from BackForwardCache for Chrome. The main use case for this project is users accidentally closing tabs and wanting to restore them shortly after. Performance gains are expected if we are able to restore these tabs instantly with all their content._
+
+At one time (in 2020) this was even implemented and [made available](https://9to5google.com/2020/07/02/google-chrome-reopen-closed-tab-instant/) behind a “Closed Tab Cache” flag in Chrome, but this is no longer available. Therefore, since there is not a reliable way to invalidate cached pages in closed browser tabs, the ability for pages served by WordPress to be stored in bfcache currently uses the “Remember Me” checkbox as an opt-in. Nevertheless, this additional privacy safeguard may be excessive. A ✨ emoji is displayed next to the checkbox in a button that opens a popover that promotes the capability.
+
+### Why is bfcache working in Chrome even though my site is using Cache-Control: no-store?
 
 Chrome [may even now](https://developer.chrome.com/docs/web-platform/bfcache-ccns) store pages served with `no-store` in bfcache, although there are still failure scenarios in which bfcache will still be blocked. These can be observed in the "Back/forward cache" panel in the Application tab of Chrome DevTools, for example:
 
